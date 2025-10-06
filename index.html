@@ -1,0 +1,231 @@
+<html>
+<body>
+<h1 id="Earnings"></h1>
+
+<canvas id="myCanvas" width="500" height="500" style="border:1px solid black;"></canvas>
+
+<script>
+const canvas = document.getElementById("myCanvas");
+const ctx = canvas.getContext("2d");
+
+let mode = "play";
+let current_garden = null;
+let Earnings = 15;
+
+document.getElementById("Earnings").innerText = `Earnings: ${Earnings}`;
+
+// Player object
+let player = {
+    radius: 10,
+    color: "blue",
+    x: 30,
+    y: 150,
+    draw: function() {
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, 2*Math.PI);
+        ctx.fillStyle = this.color;
+        ctx.fill();
+        ctx.stroke();
+    }
+};
+
+// Gardens array
+let gardens = [
+    {x: 10, y: 10, width: 100, height: 100, planted: null, growthEndTime: null, ready:null},
+    {x: 130, y: 10, width: 100, height: 100, planted: null, growthEndTime: null, ready:null},
+    {x: 250, y: 10, width: 100, height: 100, planted: null, growthEndTime: null, ready:null},
+    {x: 370, y: 10, width: 100, height: 100, planted: null, growthEndTime: null, ready:null}
+];
+
+let plants = ["Strawberry", "Blueberry"];
+let plantsLocation = [
+    {x: 100, y: 140, cost: 5, growTime: 10},
+    {x: 100, y: 170, cost: 10, growTime: 15}
+];
+
+function drawBank() {
+    ctx.fillStyle = "black";
+    ctx.fillRect(175, 350, 150, 150);
+    ctx.strokeStyle = "blue";
+    ctx.lineWidth = 5;
+    ctx.strokeRect(175, 350, 150, 150);
+
+    ctx.fillStyle = "white";
+    ctx.font = "20px Arial";
+    ctx.fillText("Bank", 225, 375);
+}
+
+function drawGardens() {
+    const now = Date.now();
+
+    gardens.forEach(g => {
+        // Base garden color
+        ctx.fillStyle = "#8B4513";
+
+        // If planted
+        if(g.planted) {
+            // Check if ready
+            if(!g.ready && g.growthEndTime && now >= g.growthEndTime) {
+                g.ready = true;
+            }
+
+            // Change color depending on readiness
+            ctx.fillStyle = g.ready ? "gold" : "green"; // green = growing, gold = ready
+        }
+
+        ctx.fillRect(g.x, g.y, g.width, g.height);
+        ctx.strokeStyle = "black";
+        ctx.lineWidth = 5;
+        ctx.strokeRect(g.x, g.y, g.width, g.height);
+
+    });
+}
+
+function circleRectCollision(circle, rect) {
+    let closestX = Math.max(rect.x, Math.min(circle.x, rect.x + rect.width));
+    let closestY = Math.max(rect.y, Math.min(circle.y, rect.y + rect.height));
+    let dx = circle.x - closestX;
+    let dy = circle.y - closestY;
+    return (dx * dx + dy * dy) < (circle.radius * circle.radius);
+}
+
+function isPlayerInBank() {
+    return player.x > 175 && player.x < 325 && player.y > 350 && player.y < 500;
+}
+
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawGardens();
+    drawBank();
+    player.draw();
+}
+
+function pickPlant() {
+    mode = "plant";
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "green";
+    ctx.fillRect(0,0, canvas.width, canvas.height);
+    ctx.fillStyle = "black";
+    ctx.font = "20px Arial";
+    ctx.fillText("What would you like to plant? Press 1 or 2", 50, 100);
+    plants.forEach((p, index) => {
+        ctx.fillText(p, 100, 140 + index * 30);
+    });
+    ctx.fillText("Press E to Exit", 100, 210);
+}
+
+function alreadyPlanted() {
+    mode = "info";
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "green";
+    ctx.fillRect(0,0, canvas.width, canvas.height);
+    ctx.fillStyle = "black";
+    ctx.font = "20px Arial";
+    ctx.fillText(`You have planted: ${current_garden.planted}`, 100, 140);
+    ctx.fillText("Press E to Exit", 100, 170);
+}
+
+function goToBank() {
+    mode = "bank";
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "red";
+    ctx.fillRect(0,0, canvas.width, canvas.height);
+    ctx.fillStyle = "black";
+    ctx.font = "20px Arial";
+    ctx.fillText(`You have: ${Earnings}!`, 100, 140);
+    ctx.fillText("Press E to Exit", 100, 170);
+}
+
+function needMoney() {
+    mode = "needmoney";
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "red";
+    ctx.fillRect(0,0, canvas.width, canvas.height);
+    ctx.fillStyle = "black";
+    ctx.font = "20px Arial";
+    ctx.fillText(`You have: ${Earnings}! Go to the Bank!`, 100, 140);
+    ctx.fillText("Press E to Exit", 100, 170);
+}
+
+// Main
+document.addEventListener("keydown", function(event) {
+
+    // Exit 
+    if (event.key === "e" || event.key === "E") {
+        if (mode !== "play") {
+            mode = "play";
+            draw();
+            return;
+        }
+    }
+
+    // Only allow movement in play mode
+    if (mode !== "play") return;
+
+    const step = 10;
+    let newX = player.x;
+    let newY = player.y;
+
+    if (event.key === "ArrowUp" || event.key === "W" || event.key === "w") newY -= step;
+    if (event.key === "ArrowDown" || event.key === "S" || event.key === "s") newY += step;
+    if (event.key === "ArrowLeft" || event.key === "A" || event.key === "a") newX -= step;
+    if (event.key === "ArrowRight" || event.key === "D" || event.key === "d") newX += step;
+
+    // Check for collisions
+    for (let g of gardens) {
+        if (circleRectCollision({x: newX, y: newY, radius: player.radius}, g)) {
+            current_garden = g;
+            if (current_garden.planted == null && Earnings > 0) {
+                pickPlant();
+            } else {
+                alreadyPlanted();
+            }
+            return;
+        }
+    }
+
+    player.x = newX;
+    player.y = newY;
+
+    // Check if player is at bank
+    if (isPlayerInBank()) {
+        goToBank();
+        return;
+    }
+
+    draw();
+});
+
+document.addEventListener("keydown", function(event) {
+    if (mode !== "plant") return;
+
+    if (Earnings <= 0) {
+        needMoney();
+        return;
+    }
+
+    if (event.key === "1") {
+        current_garden.planted = plants[0];
+        Earnings -= plantsLocation[0].cost;
+        current_garden.growthEndTime = Date.now() + plantsLocation[0].growTime * 1000;
+        current_garden.ready = false;
+        document.getElementById("Earnings").innerText = `Earnings: ${Earnings}`;
+        mode = "play";
+        draw();
+    } else if (event.key === "2") {
+        current_garden.planted = plants[1];
+        Earnings -= plantsLocation[1].cost;
+        current_garden.growthEndTime = Date.now() + plantsLocation[0].growTime * 1000;
+        current_garden.ready = false;
+        document.getElementById("Earnings").innerText = `Earnings: ${Earnings}`;
+        mode = "play";
+        draw();
+    }
+});
+
+// Initial draw
+draw();
+
+</script>
+</body>
+</html>
